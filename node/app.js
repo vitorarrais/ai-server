@@ -1,146 +1,61 @@
-const express = require('express')
-const app = express()
-const port = 3000
-var fs = require('fs')
-var { spawn } = require('child_process')
 const net = require('net')
-const wav = require('wav')
 const stream = require('stream')
+const debug = require('debug')('server')
+const express = require('express')
 
-const basePath = '/tmp/'
+const app = express()
+const NODE_PORT = 3000
+const LOCALHOST = '127.0.0.1'
+const SOCKET_PORT = 9999
 
-
-const BUNDLE_PATH = '/Users/vitorarrais/Projects/Repositories/magenta/magenta/models/performance_rnn/multiconditioned_performance_with_dynamics.mag'
-const CONFIG = 'multiconditioned_performance_with_dynamics'
-
-
+var GENERATION_REQUESTER = { 'action': 'generation' }
 
 app.get('/', (req, res) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'audio/wav');
-    // in order to serve wav files continuosly 
-    // we need to pipe the AI python script pro-
-    // cess directly to the response. This python 
-    // script keeps infinitely streaming wav files  
-    // back.
-    // Another and more elegant solution
-    // is to open a TCP socket with the python
-    // script that streams back wav files and
-    // then we pipe the socket to the response.
-    // fs.createReadStream(midiFile).pipe(res);
+    // show its working
+    res.status(206).end();
 })
 
-app.get('/socket', (req, res) => {
-    var host = '127.0.0.1';
-    var port = '9999'
+app.get('/api/music/ai', (req, res) => {
     var client = new net.Socket()
-    client.connect(port, host, function () {
-        console.log(`connected to ${host}:${port}\n`)
-        client.write('play')
+    client.connect(SOCKET_PORT, LOCALHOST, function () {
+        console.log(`[INFO] Connected to ${LOCALHOST}:${SOCKET_PORT}`)
+        // request new song by sending empty string
+        client.write(JSON.stringify(GENERATION_REQUESTER))
     })
     var buff = []
     var buff_size = 0
-    var totalsize = 0
+    var receivedChunks = 0
     client.on('data', function (data) {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'audio/wav');
+        // first chunck informs the buffer size
         var is_first_chunk = buff.length === 0 && buff_size === 0
         if (is_first_chunk) {
             let jsonObj = JSON.parse(data)
             buff_size = jsonObj.bufferSize
-            console.log(`buff_size: ${buff_size} \n`)
+            debug(`Requested buffer of size: ${buff_size}`)
         } else {
-            console.log(`Chunk received. Size: ${data.length} \n`)
-            totalsize = totalsize + data.length
+            debug(`Chunk received. Size: ${data.length}`)
+            receivedChunks = receivedChunks + data.length
             buff.push(data)
-            if (totalsize === buff_size) {
+            if (receivedChunks === buff_size) {
                 let b = Buffer.concat(buff)
-                console.log(`Buffersize: ${b.length}`)
+                debug(`Buffer of size ${b.length} allocated.`)
                 var buffStream = stream.PassThrough()
                 buffStream.end(b)
+                // stream buffer bytes to response
                 buffStream.pipe(res)
-                // var fileWriter = wav.FileWriter('/tmp/tmp01.wav', {
-                //     "channels": 1,
-                //     "sampleRate": 44100,
-                //     "bitDepth": 16
-                // })
-                // fileWriter.write(b)
-                // fileWriter.end()
             }
-            // console.log(`Buffsize: ${buff.length}`)
         }
-        // console.log(`Receiving data...\n ${data}`)
-        // var reader = new wav.Reader();
-        // reader.on('format', function (format) {
-        //     console.log(format)
-        // })
-        // res.statusCode = 200;
-        // res.setHeader('Content-Type', 'audio/wav');
-        // fs.createReadStream(data).pipe(res)
     })
-    // client.connect(port, host, socketConnectionCallback(port, host, client))
-    // client.on('data', handleSocketServerData(data, client, res))
-    // client.on('close')
 })
 
-// var handleSocketServerData = function (data, client) {
-//     console.log(`Received: ${data}\n`)
-//     client.destroy()
-//     res.writeHead(200)
-//     res.end('{ success: true}')
-
-// }
-
-// var socketConnectionCallback = function (port, host, client) {
-//     console.log(`CONNECTED TO: ${host}:${port}\n`)
-//     client.write('hello world')
-// }
 
 // todo: receive speed via socket/stream 
 app.get('/speed', (req, res) => {
-    console.log(`[INFO] GET /speed`)
-    var speed = req.query['val']
-    newSequence(speed, function () {
-        res.writeHead(200)
-        res.end(`{success: true}`)
-    })
+    res.status(404).end('Endpoint not available')
 })
 
-// put a new file in the queue
-app.post('/add/:filename', (req, res) => {
-    // todo: validate param
-    // queue.push(req.param.filename)
-    console.log(`[INFO] GET /add/${req.query}`)
-})
+app.listen(NODE_PORT, () => console.log(`[INFO] Listening to port ${NODE_PORT}`))
 
-app.listen(port, () => console.log(`[INFO] Listening to port ${port}`))
-
-var newSequence = function (speed, callback) {
-    const params = `gen --config=${CONFIG} \
-    --bundle_file=${BUNDLE_PATH} \
-    --output_dir=/tmp/performance_rnn/generated \
-    --num_outputs=1 --num_steps=300 \
-    --primer_melody='[60,62,64,65,67,69,71,72]'`
-
-    var cmd = `source ~/.zshrc; source activate magenta; ${params}`
-    // var cmd = `source ~/.zshrc; source activate magenta; ./generate.sh`
-
-
-    // const gen_process = spawn(cmd, {
-    //     stdio: 'inherit',
-    //     shell: true,
-    //     cwd: '/Users/vitorarrais/Projects/Repositories/magenta/magenta/models/performance_rnn/'
-    // })
-
-    const gen_process = spawn(cmd, {
-        stdio: 'inherit',
-        shell: true,
-        cwd: '/Users/vitorarrais/Projects/Repositories/magenta/magenta/models/performance_rnn/'
-    })
-    // gen_process.stdout.on('data', (data) => {
-    //     console.log(`Wav filename: ${data}`);
-    // });
-
-    callback()
-}
 
