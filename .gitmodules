@@ -1,0 +1,4 @@
+[submodule "python/magenta"]
+	path = python/magenta
+	url = git@github.com:vitorarrais/magenta.git
+	branch = master
