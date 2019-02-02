@@ -19,7 +19,6 @@ app.get('/api/music/ai', (req, res) => {
     var client = new net.Socket()
     client.connect(SOCKET_PORT, LOCALHOST, function () {
         console.log(`[INFO] Connected to ${LOCALHOST}:${SOCKET_PORT}`)
-        // request new song by sending empty string
         client.write(JSON.stringify(GENERATION_REQUESTER))
     })
     var buff = []
