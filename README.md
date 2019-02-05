@@ -41,7 +41,7 @@ Then you're good to go.
 ### usage
 Go to magenta/models/perfomance_rnn/ folder and run
 ```
-python ai_server.py
+python ai_generator_server.py
 ```
 
 
